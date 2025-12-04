@@ -12,3 +12,4 @@ numpy
 certifi
 urllib3
 idna
+tldextract
