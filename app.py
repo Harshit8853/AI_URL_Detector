@@ -286,7 +286,7 @@ def download_report(scan_id):
     buffer = io.BytesIO()
     WIDTH, HEIGHT = A4
     p = canvas.Canvas(buffer, pagesize=A4)
-    p.setTitle("AI Financial Threat Scanner – Report")
+    p.setTitle("AI Threat Scanner – Report")
 
     # palette
     BLUE = colors.HexColor("#2563eb")
@@ -305,7 +305,7 @@ def download_report(scan_id):
     p.rect(0, y - 70, WIDTH, 70, fill=1, stroke=0)
     p.setFillColor(colors.white)
     p.setFont("Helvetica-Bold", 18)
-    p.drawString(40, y - 45, "AI Financial Threat Scanner")
+    p.drawString(40, y - 45, "AI Financial Scanner")
     p.setFont("Helvetica", 10)
     p.drawString(40, y - 60, "Machine-learning + OSINT based URL risk report")
     y -= 90
