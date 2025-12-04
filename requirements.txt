@@ -1,0 +1,14 @@
+flask
+flask_sqlalchemy
+flask_login
+werkzeug
+reportlab
+requests
+python-whois
+gunicorn
+scikit-learn
+pandas
+numpy
+certifi
+urllib3
+idna

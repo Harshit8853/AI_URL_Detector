@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard – AI Financial Threat Scanner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/script.js') }}" defer></script>
+</head>
+<body class="app-body">
+<div class="app-shell">
+
+    <!-- Top bar & nav -->
+    <header class="topbar">
+        <div class="topbar-left">
+            <div class="logo-circle">🛡️</div>
+            <div class="logo-text-group">
+                <div class="logo-main">AI Financial Threat Scanner</div>
+                <div class="logo-sub">Detect fake financial URLs using ML + OSINT</div>
+            </div>
+        </div>
+
+        <nav class="top-nav">
+            <button class="nav-pill nav-pill-active" data-target="page-scan">Scan</button>
+            <button class="nav-pill" data-target="page-reports">Reports</button>
+            <button class="nav-pill" data-target="page-insights">Model Insights</button>
+            <button class="nav-pill" data-target="page-help">Help</button>
+        </nav>
+
+        <div class="topbar-right">
+            <!-- Theme toggle -->
+            <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">
+                <span class="theme-toggle-icon" id="themeToggleIcon">🌙</span>
+            </button>
+
+            {% if user %}
+            <span class="user-email">{{ user.email }}</span>
+            <a href="{{ url_for('logout') }}" class="logout-link">Logout</a>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- Main pages container -->
+    <main class="pages">
+
+        <!-- PAGE 1 – Scan -->
+        <section id="page-scan" class="page-section page-section-active">
+
+            <div class="main-layout">
+                <!-- Scanner column -->
+                <section class="scanner-column">
+                    <div class="card scanner-card">
+                        <h1 class="scanner-title">Scan a suspicious URL</h1>
+                        <p class="scanner-subtitle">
+                            Paste any banking or payment link. The system extracts lexical and OSINT features
+                            (WHOIS, SSL, redirects, keywords) and uses a Random Forest model to estimate risk.
+                        </p>
+
+                        <!-- IMPORTANT: IDs for JS -->
+                        <form id="scanForm" method="POST" action="{{ url_for('predict') }}" class="scan-form">
+                            <label class="scan-label">URL to analyze</label>
+                            <div class="scan-input-row">
+                                <input
+                                    id="urlInput"
+                                    type="text"
+                                    name="url"
+                                    class="scan-input"
+                                    placeholder="https://your-bank-login.example.com"
+                                    value="{{ url or '' }}"
+                                    required
+                                >
+                                <button id="scanBtn" type="submit" class="scan-button">
+                                    <span class="scan-button-text">Analyze URL</span>
+                                    <span class="scan-button-spinner" aria-hidden="true"></span>
+                                </button>
+                            </div>
+                            <p id="urlHint" class="scan-hint">
+                                Tip: Try phishing-style URLs with words like
+                                <code>login</code>, <code>verify</code>, <code>bank</code>, <code>payment</code>.
+                            </p>
+                        </form>
+
+                        <ul class="scan-bullets">
+                            <li>✓ No URLs are stored permanently; only summary scan history per user.</li>
+                            <li>✓ Model trained on phishing dataset with lexical + OSINT features.</li>
+                            <li>✓ Designed specifically for financial / payment websites.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Stats mini-dashboard -->
+                    <div class="card stats-card">
+                        <div class="stats-header">
+                            <h2 class="section-title">Your scanning stats</h2>
+                            <p class="stats-caption">
+                                Quick overview of how you’ve been using the threat scanner.
+                            </p>
+                        </div>
+                        {% if stats and stats.total > 0 %}
+                        <div class="stats-grid">
+                            <div class="stats-item">
+                                <div class="stats-label">Total scans</div>
+                                <div class="stats-value">{{ stats.total }}</div>
+                                <div class="stats-note">URLs analyzed by your account</div>
+                            </div>
+                            <div class="stats-item">
+                                <div class="stats-label">Detected phishing</div>
+                                <div class="stats-value stats-value-danger">{{ stats.phish }}</div>
+                                <div class="stats-note">
+                                    Approx. {{ stats.phish_rate }}% of your URLs look risky
+                                </div>
+                            </div>
+                            <div class="stats-item">
+                                <div class="stats-label">Legitimate URLs</div>
+                                <div class="stats-value stats-value-safe">{{ stats.legit }}</div>
+                                <div class="stats-note">Safe checks – still be cautious</div>
+                            </div>
+                            <div class="stats-item">
+                                <div class="stats-label">Last scan</div>
+                                <div class="stats-value">
+                                    {{ stats.last_scan or '–' }}
+                                </div>
+                                <div class="stats-note">Based on server time</div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <p class="stats-empty">
+                            No stats yet. Run your first scan to unlock your personal analytics.
+                        </p>
+                        {% endif %}
+                    </div>
+                </section>
+
+                <!-- Results column -->
+                <section class="results-column">
+                    {% if result %}
+                    <!-- Summary card -->
+                    <div class="card result-summary-card">
+                        <div class="result-header-row">
+                            <div>
+                                <div class="result-label">Final verdict</div>
+                                <div class="result-value {{ 'result-legit' if result == 'Legitimate' else 'result-phish' }}">
+                                    {{ result }}
+                                </div>
+                            </div>
+
+                            <div class="risk-chip {{ 'risk-chip-safe' if result == 'Legitimate' else 'risk-chip-risky' }}">
+                                {{ 'Low risk' if result == 'Legitimate' else 'High risk' }}
+                            </div>
+                        </div>
+
+                        <div class="result-url-row">
+                            <span class="result-url-label">Scanned URL</span>
+                            <span class="result-url" title="{{ url }}">{{ url }}</span>
+                        </div>
+
+                        <div class="risk-meter-block">
+                            <div class="risk-meter-label">Risk meter</div>
+                            <div class="risk-meter-bar">
+                                {% if result == 'Legitimate' %}
+                                <div class="risk-meter-fill risk-fill-safe"></div>
+                                {% else %}
+                                <div class="risk-meter-fill risk-fill-risky"></div>
+                                {% endif %}
+                            </div>
+                            <div class="risk-meter-caption">
+                                Powered by Random Forest classifier + OSINT heuristics
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- OSINT details -->
+                    <div class="card osint-card">
+                        <h2 class="section-title">OSINT feature summary</h2>
+                        <div class="osint-grid">
+                            <div class="osint-item">
+                                <div class="osint-label">Domain</div>
+                                <div class="osint-value">{{ osint.domain }}</div>
+                                <div class="osint-note">Extracted from URL</div>
+                            </div>
+
+                            <div class="osint-item">
+                                <div class="osint-label">HTTPS</div>
+                                <div class="osint-chip {{ 'chip-ok' if osint.https == 1 else 'chip-bad' }}">
+                                    {{ "Enabled" if osint.https == 1 else "Not using HTTPS" }}
+                                </div>
+                                <div class="osint-note">Whether the scheme is https://</div>
+                            </div>
+
+                            <div class="osint-item">
+                                <div class="osint-label">SSL certificate</div>
+                                <div class="osint-chip {{ 'chip-ok' if osint.ssl_valid == 1 else 'chip-bad' }}">
+                                    {{ "Valid certificate" if osint.ssl_valid == 1 else "Certificate issue" }}
+                                </div>
+                                <div class="osint-note">Checked via TLS handshake</div>
+                            </div>
+
+                            <div class="osint-item">
+                                <div class="osint-label">Domain age</div>
+                                <div class="osint-value">
+                                    {{ osint.domain_age_days }} <span class="osint-unit">days</span>
+                                </div>
+                                <div class="osint-note">
+                                    Newly registered domains are more likely to be malicious.
+                                </div>
+                            </div>
+
+                            <div class="osint-item">
+                                <div class="osint-label">Redirects</div>
+                                <div class="osint-value">
+                                    {{ osint.redirects }}
+                                </div>
+                                <div class="osint-note">
+                                    Long redirect chains can hide the final destination.
+                                </div>
+                            </div>
+
+                            <div class="osint-item">
+                                <div class="osint-label">Suspicious keywords</div>
+                                <div class="osint-value">
+                                    {{ osint.suspicious_keywords }}
+                                </div>
+                                <div class="osint-note">
+                                    login, secure, verify, update, bank, payment...
+                                </div>
+                            </div>
+
+                            <div class="osint-item">
+                                <div class="osint-label">Subdomain count</div>
+                                <div class="osint-value">
+                                    {{ osint.subdomain_count }}
+                                </div>
+                                <div class="osint-note">
+                                    Very deep subdomains can be a phishing signal.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- Empty state if no scan yet -->
+                    <div class="card empty-result-card">
+                        <div class="empty-emoji">🔍</div>
+                        <div class="empty-title">No scan yet</div>
+                        <p class="empty-text">
+                            Enter a URL on the left and click <strong>Analyze URL</strong> to see the machine-learning
+                            verdict and OSINT analysis here.
+                        </p>
+                    </div>
+                    {% endif %}
+                </section>
+            </div>
+        </section>
+
+        <!-- PAGE 2 – Reports / History -->
+        <section id="page-reports" class="page-section">
+            <section class="history-section">
+                <div class="card">
+                    <div class="history-header">
+                        <h2 class="section-title">Recent scans & reports</h2>
+                        <p class="history-caption">
+                            Last 10 URLs scanned by your account. Download a PDF report or re-open results quickly.
+                        </p>
+                    </div>
+
+                    {% if history and history|length > 0 %}
+                    <div class="history-table-wrapper">
+                        <table class="history-table">
+                            <thead>
+                            <tr>
+                                <th>When</th>
+                                <th>URL</th>
+                                <th>Result</th>
+                                <th>Domain</th>
+                                <th>Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for s in history %}
+                            <tr>
+                                <td>{{ s.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td class="history-url-cell" title="{{ s.url }}">{{ s.url }}</td>
+                                <td>
+                                    <span class="badge {{ 'badge-legit' if s.result == 'Legitimate' else 'badge-phish' }}">
+                                        {{ s.result }}
+                                    </span>
+                                </td>
+                                <td>{{ s.domain or '-' }}</td>
+                                <td class="history-actions">
+                                    <a href="{{ url_for('download_report', scan_id=s.id) }}" class="btn-small">
+                                        Download PDF
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="history-empty">
+                        No scans yet. Run your first URL analysis on the Scan page.
+                    </p>
+                    {% endif %}
+                </div>
+            </section>
+        </section>
+
+        <!-- PAGE 3 – Model Insights -->
+        <section id="page-insights" class="page-section">
+            <div class="insights-layout">
+                <div class="card insights-hero">
+                    <h2 class="section-title">How the model works</h2>
+                    <p class="insights-text">
+                        The system uses a Random Forest classifier trained on a phishing dataset. It combines lexical
+                        features (length, character patterns, suspicious tokens) with OSINT features such as WHOIS
+                        domain age, SSL validity, HTTPS usage, redirect behaviour, and subdomain depth.
+                    </p>
+
+                    <div class="insights-badges">
+                        <span class="pill">Random Forest (Ensemble)</span>
+                        <span class="pill">Supervised Learning</span>
+                        <span class="pill">URL + OSINT features</span>
+                    </div>
+                </div>
+
+                <div class="insights-grid">
+                    <div class="card mini-card">
+                        <div class="mini-label">Dataset</div>
+                        <div class="mini-value">10,000+ URLs</div>
+                        <p class="mini-note">
+                            Mix of legitimate banking/payment URLs and labelled phishing URLs.
+                        </p>
+                    </div>
+
+                    <div class="card mini-card">
+                        <div class="mini-label">Model accuracy</div>
+                        <div class="mini-value">≈ 96%</div>
+                        <p class="mini-note">
+                            Evaluated on hold-out test set using precision, recall and F1-score.
+                        </p>
+                    </div>
+
+                    <div class="card mini-card">
+                        <div class="mini-label">Key feature groups</div>
+                        <ul class="mini-list">
+                            <li>URL lexical structure (length, digits, special chars)</li>
+                            <li>Domain age & registration information</li>
+                            <li>SSL / HTTPS and redirect behaviour</li>
+                            <li>Suspicious keywords in host & path</li>
+                        </ul>
+                    </div>
+
+                    <div class="card mini-card">
+                        <div class="mini-label">Usage in banking</div>
+                        <p class="mini-note">
+                            Can be integrated into online banking, payment gateways or internal SOC tools to pre-filter
+                            risky URLs before they are opened by customers or employees.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE 4 – Help / FAQ -->
+        <section id="page-help" class="page-section">
+            <div class="help-layout">
+                <div class="card">
+                    <h2 class="section-title">How to use this tool in practice</h2>
+                    <ol class="help-steps">
+                        <li>Copy any suspicious banking or payment link from email, SMS, WhatsApp or a website.</li>
+                        <li>Paste it into the <strong>Scan</strong> page and click <strong>Analyze URL</strong>.</li>
+                        <li>Check the <strong>Final verdict</strong> and <strong>OSINT feature summary</strong>.</li>
+                        <li>Open the <strong>Reports</strong> page and download a PDF if you need evidence.</li>
+                    </ol>
+                </div>
+
+                <div class="card">
+                    <h3 class="section-title">FAQ</h3>
+                    <div class="faq-item">
+                        <div class="faq-q">Does the tool guarantee 100% accuracy?</div>
+                        <div class="faq-a">
+                            No model can be perfect. This tool is designed as a decision-support system to highlight
+                            risky URLs and reduce human error, not to replace security teams.
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-q">What data is stored?</div>
+                        <div class="faq-a">
+                            Only minimal scan history is stored in a local SQLite database for demonstration: URL,
+                            verdict and OSINT summary. No user passwords are stored in plain text (hashed only).
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-q">Can this model be retrained?</div>
+                        <div class="faq-a">
+                            Yes. New phishing datasets can be used to retrain the Random Forest and update the
+                            <code>.pkl</code> model without changing the web interface.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="footer">
+        Minor Project · Random Forest · OSINT-based Financial URL Analysis
+    </footer>
+</div>
+</body>
+</html>
